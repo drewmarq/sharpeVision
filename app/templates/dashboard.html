@@ -1,0 +1,132 @@
+{% extends "base.html" %} {% block content %}
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-header">
+        <h3>Stock Analysis Dashboard</h3>
+      </div>
+      <div class="card-body">
+        <form class="mb-4" id="stock-form">
+          <div class="input-group">
+            <input
+              type="text"
+              class="form-control"
+              placeholder="Enter ticker symbol (e.g., AAPL)"
+              id="ticker-input"
+              required
+            />
+            <button class="btn btn-primary" type="submit">Search</button>
+          </div>
+        </form>
+        <div id="loading" style="display: none">
+          <div class="text-center">
+            <div class="spinner-border" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+          </div>
+        </div>
+        <div id="stock-data" class="mt-4">
+          <!-- Stock data will be loaded here -->
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document
+    .getElementById("stock-form")
+    .addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const ticker = document
+        .getElementById("ticker-input")
+        .value.toUpperCase();
+      const loadingDiv = document.getElementById("loading");
+      const stockDataDiv = document.getElementById("stock-data");
+
+      // Show loading spinner
+      loadingDiv.style.display = "block";
+      stockDataDiv.innerHTML = "";
+
+      try {
+        const response = await fetch(`/api/stock/${ticker}`);
+        const data = await response.json();
+
+        if (response.ok) {
+          // Format the data nicely
+          const metrics = data.metrics;
+          const ratios = data.ratios;
+
+          stockDataDiv.innerHTML = `
+                <h4>${ticker} Financial Metrics</h4>
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5>Key Metrics</h5>
+                        <table class="table">
+                            <tbody>
+                                <tr>
+                                    <td>Revenue</td>
+                                    <td>$${formatNumber(metrics.revenue)}</td>
+                                </tr>
+                                <tr>
+                                    <td>Net Income</td>
+                                    <td>$${formatNumber(
+                                      metrics.net_income
+                                    )}</td>
+                                </tr>
+                                <tr>
+                                    <td>Total Assets</td>
+                                    <td>$${formatNumber(
+                                      metrics.total_assets
+                                    )}</td>
+                                </tr>
+                                <tr>
+                                    <td>Total Liabilities</td>
+                                    <td>$${formatNumber(
+                                      metrics.total_liabilities
+                                    )}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h5>Financial Ratios</h5>
+                        <table class="table">
+                            <tbody>
+                                <tr>
+                                    <td>Gross Margin</td>
+                                    <td>${formatNumber(
+                                      ratios.gross_margin
+                                    )}%</td>
+                                </tr>
+                                <tr>
+                                    <td>Debt to Equity</td>
+                                    <td>${formatNumber(
+                                      ratios.debt_to_equity
+                                    )}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        } else {
+          stockDataDiv.innerHTML = `<div class="alert alert-danger">Error: ${data.error}</div>`;
+        }
+      } catch (error) {
+        stockDataDiv.innerHTML = `<div class="alert alert-danger">Error fetching data: ${error.message}</div>`;
+      } finally {
+        loadingDiv.style.display = "none";
+      }
+    });
+
+  function formatNumber(num) {
+    if (num === null || num === undefined) return "N/A";
+    return new Intl.NumberFormat("en-US", {
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 2,
+    }).format(num);
+  }
+</script>
+{% endblock %}

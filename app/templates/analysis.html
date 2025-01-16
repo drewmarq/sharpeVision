@@ -1,0 +1,176 @@
+{% extends "base.html" %} {% block content %}
+<div class="container-fluid">
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header">
+          <h3>Market Analysis Dashboard</h3>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-4">
+              <select class="form-select" id="sector-select">
+                <option value="">Select Sector...</option>
+                {% for sector in sectors %}
+                <option value="{{ sector }}">{{ sector }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-4">
+              <select class="form-select" id="metric-select">
+                <option value="revenue_growth">Revenue Growth</option>
+                <option value="gross_margin">Gross Margin</option>
+                <option value="debt_to_equity">Debt to Equity</option>
+                <!-- Add more metrics -->
+              </select>
+            </div>
+            <div class="col-md-4">
+              <button class="btn btn-primary" id="analyze-btn">Analyze</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-header">
+          <h4>Companies Comparison</h4>
+        </div>
+        <div class="card-body">
+          <div id="comparison-table"></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-header">
+          <h4>Sector Overview</h4>
+        </div>
+        <div class="card-body">
+          <div id="sector-metrics"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.getElementById("analyze-btn").addEventListener("click", async () => {
+    const sector = document.getElementById("sector-select").value;
+    const metric = document.getElementById("metric-select").value;
+
+    if (!sector) {
+      alert("Please select a sector");
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/analysis/sector/${sector}`);
+      const data = await response.json();
+
+      if (response.ok) {
+        displayComparisonTable(data.companies, metric);
+        displaySectorMetrics(data.companies, metric);
+      } else {
+        alert(`Error: ${data.error}`);
+      }
+    } catch (error) {
+      console.error("Error:", error);
+      alert("Error fetching data");
+    }
+  });
+
+  function displayComparisonTable(companies, metric) {
+    const table = document.createElement("table");
+    table.className = "table table-striped";
+
+    // Sort companies by the selected metric
+    companies.sort(
+      (a, b) =>
+        (b.metrics.ratios[metric] || 0) - (a.metrics.ratios[metric] || 0)
+    );
+
+    // Create table header
+    const thead = table.createTHead();
+    const headerRow = thead.insertRow();
+    ["Ticker", "Company", metric.replace("_", " ")].forEach((text) => {
+      const th = document.createElement("th");
+      th.textContent = text;
+      headerRow.appendChild(th);
+    });
+
+    // Create table body
+    const tbody = table.createTBody();
+    companies.forEach((company) => {
+      const row = tbody.insertRow();
+      row.insertCell().textContent = company.ticker;
+      row.insertCell().textContent = company.name;
+      row.insertCell().textContent = formatNumber(
+        company.metrics.ratios[metric]
+      );
+    });
+
+    document.getElementById("comparison-table").innerHTML = "";
+    document.getElementById("comparison-table").appendChild(table);
+  }
+
+  function displaySectorMetrics(companies, metric) {
+    const values = companies
+      .map((c) => c.metrics.ratios[metric])
+      .filter((v) => v != null);
+
+    const metrics = {
+      Average: average(values),
+      Median: median(values),
+      "Top Quartile": percentile(values, 75),
+      "Bottom Quartile": percentile(values, 25),
+    };
+
+    const html = Object.entries(metrics)
+      .map(
+        ([label, value]) =>
+          `<div class="mb-3">
+                <label class="fw-bold">${label}:</label>
+                <span>${formatNumber(value)}</span>
+             </div>`
+      )
+      .join("");
+
+    document.getElementById("sector-metrics").innerHTML = html;
+  }
+
+  // Helper functions for calculations
+  function average(arr) {
+    return arr.reduce((a, b) => a + b, 0) / arr.length;
+  }
+
+  function median(arr) {
+    const sorted = [...arr].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2
+      ? sorted[mid]
+      : (sorted[mid - 1] + sorted[mid]) / 2;
+  }
+
+  function percentile(arr, p) {
+    const sorted = [...arr].sort((a, b) => a - b);
+    const pos = ((sorted.length - 1) * p) / 100;
+    const base = Math.floor(pos);
+    const rest = pos - base;
+    return sorted[base + 1] !== undefined
+      ? sorted[base] + rest * (sorted[base + 1] - sorted[base])
+      : sorted[base];
+  }
+
+  function formatNumber(num) {
+    if (num === null || num === undefined) return "N/A";
+    return new Intl.NumberFormat("en-US", {
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 2,
+    }).format(num);
+  }
+</script>
+{% endblock %}
